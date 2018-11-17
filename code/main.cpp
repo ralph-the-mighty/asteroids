@@ -23,11 +23,11 @@ SDL_Window* gWindow = NULL;
 SDL_Surface* gScreenSurface = NULL;
 KeyState Keys[1024] = {0};
 
-bool running = true;
-
+static bool running = true;
+static bool DrawAntialiased = false;
 
 #define ANGLE M_PI * 0.02
-#define MAX_VEL 3.0f
+#define MAX_VEL 200.0f
 #define MIN_VEL 0.0f
 
 
@@ -351,9 +351,7 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
 
 
 
-void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
-    local_persist bool DrawAntialiased = false;
-    
+void Update(GameState* game, double dt) {
     
     //ProcessInput(game, Surface);
     if(Keys[SDL_SCANCODE_LEFT].isDown) {
@@ -373,7 +371,7 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
         GlobalGameState.player.rotation = NewRotation;
     }
     if(Keys[SDL_SCANCODE_UP].isDown) {
-        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 0.1;
+        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 5;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
         }
@@ -384,8 +382,8 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
     }
     
     //update player
-    game->player.pos.x += game->player.vel.x;
-    game->player.pos.y += game->player.vel.y;
+    game->player.pos.x += game->player.vel.x * dt;
+    game->player.pos.y += game->player.vel.y * dt;
     
     if (game->player.pos.x < 20) {
         game->player.pos.x = SCREEN_WIDTH - 20;
@@ -406,8 +404,8 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
     
     //update asteroids
     for(int i = 0; i < game->AsteroidCount; i++) {
-        game->Asteroids[i].pos.x += game->Asteroids[i].vel.x;
-        game->Asteroids[i].pos.y += game->Asteroids[i].vel.y;
+        game->Asteroids[i].pos.x += game->Asteroids[i].vel.x * dt;
+        game->Asteroids[i].pos.y += game->Asteroids[i].vel.y * dt;
         
         
         if (game->Asteroids[i].pos.x < 20) {
@@ -428,17 +426,15 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
         }
         
     }
-    
-    
+}
+
+void Draw(GameState* game, SDL_Surface* Surface) { 
     
     //Drawing
     SDL_FillRect(Surface, NULL, SDL_MapRGB(Surface->format, 0, 0, 0));
     DrawAsteroids(Surface, &GlobalGameState);
     DrawPlayer(Surface, &(game->player), DrawAntialiased);
-    
 }
-
-
 
 void ProcessEvents() {
     
@@ -493,36 +489,34 @@ void InitGame(GameState* State) {
 
 
 int main( int argc, char* args[] ) {
-    
-    
-    
     if(!init()){
         return 0;
     }
     
     InitGame(&GlobalGameState);
     
+    double SecondsPerTick = 1.0 / SDL_GetPerformanceFrequency();
+    const double dt = 0.01;
+    double currentTime = SDL_GetPerformanceCounter() * SecondsPerTick;
+    double accumulator = 0.0;
     
-    unsigned int FPS = 60;
-    float MilisecondsPerFrame = 1 / FPS * 1000;
-    Uint32 FrameTimeEnd = 0;
-    Uint32 FrameTimeStart = 0;
-    Uint32 FrameTimeElapsed = 0;
-    
+    printf("seconds per tick: %f\n", SecondsPerTick);
+    printf("currentTime: %f\n", currentTime);
     
     while(running) {
-        FrameTimeStart = SDL_GetTicks();
         ProcessEvents();
-        UpdateAndDraw(&GlobalGameState, gScreenSurface);
-        SDL_UpdateWindowSurface(gWindow);
+        double newTime = SDL_GetPerformanceCounter() * SecondsPerTick;
+        double frameTime = newTime - currentTime;
+        currentTime = newTime;
+        accumulator += frameTime;
         
-        // TODO(Josh): do actual fixed framerate control
-        FrameTimeEnd = SDL_GetTicks();
-        FrameTimeElapsed = FrameTimeEnd - FrameTimeStart;
-        if(FrameTimeElapsed < 16) {
-            SDL_Delay(16 - FrameTimeElapsed);
+        while(accumulator >= dt) {
+            Update(&GlobalGameState, dt);
+            accumulator -= dt;
         }
-        printf("miliseconds this frame: %i\n", SDL_GetTicks() - FrameTimeStart);
+        
+        Draw(&GlobalGameState, gScreenSurface);
+        SDL_UpdateWindowSurface(gWindow);
     }
     
     close();
