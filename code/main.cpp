@@ -3,7 +3,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <stdio.h>
-
+#include "enemies.h"
 #include "jmath.h"
 
 
@@ -35,6 +35,7 @@ bool running = true;
 #define local_persist static
 #define global_variable static
 
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
 
 struct Player {
@@ -47,6 +48,9 @@ struct Player {
 struct GameState {
     Player player;
     int score;
+    
+    asteroid* Asteroids;
+    unsigned int AsteroidCount;
 };
 
 
@@ -103,11 +107,24 @@ void DrawRect(SDL_Surface* Surface, int RectX, int  RectY, int RectW, int RectH,
 
 
 
-void PlotPoint(SDL_Surface* Surface, int X, int Y, int R, int G, int B){
+void PlotPoint(SDL_Surface* Surface, int X, int Y, unsigned int R, unsigned int G, unsigned int B){
     unsigned int* Pixel = (unsigned int *)((char*)Surface->pixels + Y * Surface->pitch + X*4);
     //*Pixel = SDL_MapRGB(Surface->format, R, G, B);
     *Pixel = (R) | (G << 8) | (B << 16);
 }
+
+
+
+void PlotPointBlend(SDL_Surface* Surface, int X, int Y, unsigned char Brightness) {
+    unsigned int* PixelP = (unsigned int *)((char*)Surface->pixels + Y * Surface->pitch + X*4);
+    if (Brightness > (unsigned char) *PixelP) {
+        *PixelP = (Brightness) | (Brightness << 8) | (Brightness << 16);
+    }
+    
+    
+}
+
+
 
 
 void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int R, int G, int B) {
@@ -136,23 +153,23 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
     if(X0 == X1){
         //vertical line
         // TODO(JOSH): Too many conditionals here. break into separate branches
-        for(int Y = MIN(Y0, Y1); Y < MAX(Y0, Y1) + 1; Y++) {
+        for(int Y = MIN(Y0, Y1); Y <= MAX(Y0, Y1); Y++) {
             //TODO: just set the bloody pixels
-            PlotPoint(Surface,X0, Y, R, G, B);
+            PlotPointBlend(Surface, X0, Y, 0xff);
         }
     } else if (Y0 == Y1) {
         //horizontal line
-        for(int X = MIN(X0, X1); X < MAX(X0, X1) + 1; X++) {
+        for(int X = MIN(X0, X1); X <= MAX(X0, X1); X++) {
             //TODO: just set the bloody pixels
-            PlotPoint(Surface,X, Y0, R, G, B);
+            PlotPointBlend(Surface, X, Y0, 0xff);
         }
     } else if (ABS(Slope) < 1) {
         //shallow line
         float Error = 0;
         int Y = Y0;
         
-        for(int X = X0; X < X1; X++) {
-            PlotPoint(Surface, X, Y, R, G, B);
+        for(int X = X0; X <= X1; X++) {
+            PlotPointBlend(Surface, X, Y, 0xff);
             Error += ABS(Slope);
             while(Error >= 0.5) {
                 Y += DeltaY < 0 ? 1 : -1;
@@ -168,8 +185,8 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
         int X = X0;
         
         if(Y0 < Y1) {
-            for(int Y = Y0; Y < Y1; Y++) {
-                PlotPoint(Surface, X, Y, R, G, B);
+            for(int Y = Y0; Y <= Y1; Y++) {
+                PlotPointBlend(Surface, X, Y, 0xff);
                 Error += DeltaError;
                 while(Error >= 0.5) {
                     X += DeltaX < 0 ? 1 : -1;
@@ -177,8 +194,8 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
                 }
             }
         } else {
-            for(int Y = Y0; Y > Y1; Y--) {
-                PlotPoint(Surface, X, Y, R, G, B);
+            for(int Y = Y0; Y >= Y1; Y--) {
+                PlotPointBlend(Surface, X, Y, 0xff);
                 Error += DeltaError;
                 while(Error >= 0.5) {
                     X += DeltaX < 0 ? 1 : -1;
@@ -188,6 +205,9 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
         }
     }
 }
+
+
+
 
 
 
@@ -213,48 +233,66 @@ void DrawLineWu(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1) {
     if(X0 == X1){
         //vertical line
         // TODO(JOSH): Too many conditionals here. break into separate branches
-        for(int Y = MIN(Y0, Y1); Y <= MAX(Y0, Y1) + 1; Y++) {
+        for(int Y = MIN(Y0, Y1); Y <= MAX(Y0, Y1); Y++) {
             //TODO: just set the bloody pixels
-            PlotPoint(Surface,X0, Y, 255, 255, 255);
+            //PlotPoint(Surface,X0, Y, 255, 255, 255);
+            PlotPointBlend(Surface, X0, Y, 255);
         }
     } else if (Y0 == Y1) {
         //horizontal line
-        for(int X = MIN(X0, X1); X <= MAX(X0, X1) + 1; X++) {
+        for(int X = MIN(X0, X1); X <= MAX(X0, X1); X++) {
             //TODO: just set the bloody pixels
-            PlotPoint(Surface,X, Y0, 255, 255, 255);
+            PlotPointBlend(Surface,X, Y0, 255);
+        }
+    } else if (ABS(Slope) == 1) {
+        //diagonal line
+        int X = X0;
+        int Y = Y0;
+        while(X <= X1) {
+            PlotPointBlend(Surface, X, Y, 255);
+            X++;
+            Y += (int)Slope;
         }
     } else if (ABS(Slope) < 1) {
         //shallow line
-        
-        float Y = Y0;
-        for(int X = X0; X < X1; X++) {
+        //draw begin
+        PlotPoint(Surface, X0, Y0, 0xff, 0xff, 0xff);
+        float Y = Y0 + Slope;
+        for(int X = X0 + 1; X < X1; X++) {
             float I1 = 1 - FractionalPart(Y);
             float I2 = FractionalPart(Y);
-            PlotPoint(Surface, X, IntegerPart(Y),     I2 * 255, I2 * 255, I2 * 255);
-            PlotPoint(Surface, X, IntegerPart(Y) - 1, I1 * 255, I1 * 255, I1 * 255);
+            PlotPointBlend(Surface, X, IntegerPart(Y),     I1 * 255);
+            PlotPointBlend(Surface, X, IntegerPart(Y) + 1, I2 * 255);
             Y += Slope;
         }
+        //draw end
+        PlotPointBlend(Surface, X1, Y1, 0xff);
         
     } else {
         //deep line
         if (Y0 < Y1) {
-            float X = X0;
-            for(int Y = Y0; Y < Y1; Y++) {
+            PlotPointBlend(Surface, X0, Y0, 0xff);
+            float X = X0 + 1/Slope;
+            for(int Y = Y0 + 1; Y < Y1; Y++) {
                 float I1 = 1 - FractionalPart(X);
                 float I2 = FractionalPart(X);
-                PlotPoint(Surface, IntegerPart(X),     Y, I2 * 255, I2 * 255, I2 * 255);
-                PlotPoint(Surface, IntegerPart(X) - 1 ,Y, I1 * 255, I1 * 255, I1 * 255);
+                PlotPointBlend(Surface, IntegerPart(X),     Y, I1 * 255);
+                PlotPointBlend(Surface, IntegerPart(X) + 1 ,Y, I2 * 255);
                 X += 1/Slope;
             }
+            PlotPointBlend(Surface, X1, Y1, 0xff);
         } else {
-            float X = X0;
-            for(int Y = Y0; Y > Y1; Y--) {
+            PlotPoint(Surface, X0, Y0, 0xff, 0xff, 0xff);
+            float X = X0 - 1/Slope;
+            for(int Y = Y0 - 1; Y > Y1; Y--) {
                 float I1 = 1 - FractionalPart(X);
                 float I2 = FractionalPart(X);
-                PlotPoint(Surface, IntegerPart(X),     Y, I2 * 255, I2 * 255, I2 * 255);
-                PlotPoint(Surface, IntegerPart(X) - 1 ,Y, I1 * 255, I1 * 255, I1 * 255);
+                PlotPointBlend(Surface, IntegerPart(X),     Y, I1 * 255);
+                PlotPointBlend(Surface, IntegerPart(X) + 1 ,Y, I2 * 255);
                 X -= 1/Slope;
+                
             }
+            PlotPointBlend(Surface, X1, Y1, 0xff);
         }
     }
 }
@@ -272,16 +310,16 @@ void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
     PerpRotation.x = player->rotation.y;
     PerpRotation.y = -player->rotation.x;
     
-    Point1 = player->pos + PerpRotation * 8;
-    Point2 = player->pos - PerpRotation * 8;
-    Point3 = player->pos + player->rotation * 20;
+    Point1 = player->pos + (PerpRotation * 6) - (player->rotation * 5);
+    Point2 = player->pos - (PerpRotation * 6) - (player->rotation * 5);
+    Point3 = player->pos + player->rotation * 15;
     
     
     if(AntiAliased) {
         
-        DrawLineWu(Surface, (int) Point1.x, (int) Point1.y, (int) Point2.x, (int) Point2.y);
-        DrawLineWu(Surface, (int) Point2.x, (int) Point2.y, (int) Point3.x, (int) Point3.y);
-        DrawLineWu(Surface, (int) Point3.x, (int) Point3.y, (int) Point1.x, (int) Point1.y);
+        DrawLineWu(Surface, Round(Point1.x), Round(Point1.y), Round(Point2.x), Round(Point2.y));
+        DrawLineWu(Surface, Round( Point2.x), Round(Point2.y), Round(Point3.x), Round(Point3.y));
+        DrawLineWu(Surface, Round(Point3.x), Round(Point3.y), Round(Point1.x), Round(Point1.y));
     } else {
         
         DrawLineBresenham(Surface, (int) Point1.x, (int) Point1.y, (int) Point2.x, (int) Point2.y, 0xff, 0xff, 0xff);
@@ -289,16 +327,27 @@ void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
         DrawLineBresenham(Surface, (int) Point3.x, (int) Point3.y, (int) Point1.x, (int) Point1.y, 0xff, 0xff, 0xff);
     }
     
-    /*
-    DrawLineBresenham(Surface, (int)player->pos.x - 8, (int)player->pos.y, (int)player->pos.x + 8, (int)player->pos.y, 0xff, 0xff, 0xff);
-    DrawLineBresenham(Surface, (int)player->pos.x + 8, (int)player->pos.y, (int)player->pos.x, (int)player->pos.y + 20, 0xff, 0xff, 0xff);
-    DrawLineBresenham(Surface, player->pos.x, player->pos.y + 20, (int)player->pos.x - 8, (int) player->pos.y, 0xff, 0xff, 0xff);
-    */
 }
 
 
 
-
+void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
+    
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        asteroid A = State->Asteroids[i];
+        int j;
+        for(j = 0; j < ARRAY_SIZE(A.vertices) - 1; j++) {
+            
+            DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
+                       (int) A.vertices[j + 1].x + A.pos.x,
+                       (int) A.vertices[j + 1].y + A.pos.y);
+        }
+        
+        DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
+                   (int) A.vertices[0].x + A.pos.x,
+                   (int) A.vertices[0].y + A.pos.y);
+    }
+}
 
 
 
@@ -324,7 +373,7 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
         GlobalGameState.player.rotation = NewRotation;
     }
     if(Keys[SDL_SCANCODE_UP].isDown) {
-        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 0.05;
+        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 0.1;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
         }
@@ -334,7 +383,7 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
         DrawAntialiased = !DrawAntialiased;
     }
     
-    //update
+    //update player
     game->player.pos.x += game->player.vel.x;
     game->player.pos.y += game->player.vel.y;
     
@@ -355,42 +404,37 @@ void UpdateAndDraw(GameState* game, SDL_Surface* Surface) {
         game->player.pos.y = 20;
     }
     
+    //update asteroids
+    for(int i = 0; i < game->AsteroidCount; i++) {
+        game->Asteroids[i].pos.x += game->Asteroids[i].vel.x;
+        game->Asteroids[i].pos.y += game->Asteroids[i].vel.y;
+        
+        
+        if (game->Asteroids[i].pos.x < 20) {
+            game->Asteroids[i].pos.x = SCREEN_WIDTH - 20;
+        }
+        
+        if (game->Asteroids[i].pos.x > SCREEN_WIDTH - 20) {
+            game->Asteroids[i].pos.x = 20;
+        }
+        
+        
+        if (game->Asteroids[i].pos.y < 20) {
+            game->Asteroids[i].pos.y = SCREEN_HEIGHT - 20;
+        }
+        
+        if (game->Asteroids[i].pos.y > SCREEN_HEIGHT - 20) {
+            game->Asteroids[i].pos.y = 20;
+        }
+        
+    }
+    
     
     
     //Drawing
     SDL_FillRect(Surface, NULL, SDL_MapRGB(Surface->format, 0, 0, 0));
+    DrawAsteroids(Surface, &GlobalGameState);
     DrawPlayer(Surface, &(game->player), DrawAntialiased);
-    
-    
-    //TEST
-    
-#if 0    
-    local_persist int X0 = 320;
-    local_persist int Y0 = 240;
-    
-    local_persist int X1 = 420;
-    local_persist int Y1 = 290;
-    
-    
-    DrawLineWu(gScreenSurface, X0, Y0, X1, Y1);
-    
-    if(Keys[SDL_SCANCODE_RIGHT]) {
-        X1++;
-    }
-    
-    if(Keys[SDL_SCANCODE_LEFT]) {
-        X1--;
-    }
-    
-    if(Keys[SDL_SCANCODE_UP]) {
-        Y1--;
-    }
-    
-    if(Keys[SDL_SCANCODE_DOWN]) {
-        Y1++;
-    }
-#endif
-    
     
 }
 
@@ -423,30 +467,64 @@ void ProcessEvents() {
 
 
 
+
+void InitGame(GameState* State) {
+    State->player.pos = V2(320, 240);
+    State->player.vel = {0};
+    State->player.rotation = {0};
+    State->player.rotation.y = 1;
+    
+    
+    State->AsteroidCount = 5;
+    
+    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        State->Asteroids[i].vertices[0] = {-5,-5};
+        State->Asteroids[i].vertices[1] = {-5,5};
+        State->Asteroids[i].vertices[2] = {0,7};
+        State->Asteroids[i].vertices[3] = {5,5};
+        State->Asteroids[i].vertices[4] = {5,-5};
+        
+        State->Asteroids[i].pos = {(float)20 * i + 100, (float)20 * i + 100};
+        State->Asteroids[i].vel = {(float)1 * i, (float)1 * i};
+    }
+} 
+
+
+
 int main( int argc, char* args[] ) {
     
-    GlobalGameState.player.pos = V2(320, 240);
-    GlobalGameState.player.vel = {0};
-    GlobalGameState.player.rotation = {0};
-    GlobalGameState.player.rotation.y = 1;
     
     
     if(!init()){
         return 0;
     }
     
+    InitGame(&GlobalGameState);
+    
+    
+    unsigned int FPS = 60;
+    float MilisecondsPerFrame = 1 / FPS * 1000;
+    Uint32 FrameTimeEnd = 0;
+    Uint32 FrameTimeStart = 0;
+    Uint32 FrameTimeElapsed = 0;
+    
+    
     while(running) {
+        FrameTimeStart = SDL_GetTicks();
         ProcessEvents();
         UpdateAndDraw(&GlobalGameState, gScreenSurface);
         SDL_UpdateWindowSurface(gWindow);
         
         // TODO(Josh): do actual fixed framerate control
-        SDL_Delay(10);
+        FrameTimeEnd = SDL_GetTicks();
+        FrameTimeElapsed = FrameTimeEnd - FrameTimeStart;
+        if(FrameTimeElapsed < 16) {
+            SDL_Delay(16 - FrameTimeElapsed);
+        }
+        printf("miliseconds this frame: %i\n", SDL_GetTicks() - FrameTimeStart);
     }
-    
-    
     
     close();
     return 0;
-    
 }
