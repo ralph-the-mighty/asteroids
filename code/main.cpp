@@ -6,6 +6,17 @@
 #include "enemies.h"
 #include "jmath.h"
 
+#define ANGLE M_PI * 0.01
+#define MAX_VEL 200.0f
+#define MIN_VEL 0.0f
+
+
+#define internal static
+#define local_persist static
+#define global_variable static
+
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
+
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -23,19 +34,10 @@ SDL_Window* gWindow = NULL;
 SDL_Surface* gScreenSurface = NULL;
 KeyState Keys[1024] = {0};
 
-static bool running = true;
-static bool DrawAntialiased = false;
-
-#define ANGLE M_PI * 0.02
-#define MAX_VEL 200.0f
-#define MIN_VEL 0.0f
+bool running = true;
+bool DrawAntialiased = false;
 
 
-#define internal static
-#define local_persist static
-#define global_variable static
-
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
 
 struct Player {
@@ -504,13 +506,13 @@ int main( int argc, char* args[] ) {
     printf("currentTime: %f\n", currentTime);
     
     while(running) {
-        ProcessEvents();
         double newTime = SDL_GetPerformanceCounter() * SecondsPerTick;
         double frameTime = newTime - currentTime;
         currentTime = newTime;
         accumulator += frameTime;
         
         while(accumulator >= dt) {
+            ProcessEvents();
             Update(&GlobalGameState, dt);
             accumulator -= dt;
         }
