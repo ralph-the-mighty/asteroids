@@ -334,12 +334,12 @@ void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
 
 
 void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
-    
+    /*
     for(int i = 0; i < State->AsteroidCount; i++) {
         asteroid A = State->Asteroids[i];
         int j;
         for(j = 0; j < ARRAY_SIZE(A.vertices) - 1; j++) {
-            
+        
             DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
                        (int) A.vertices[j + 1].x + A.pos.x,
                        (int) A.vertices[j + 1].y + A.pos.y);
@@ -348,7 +348,41 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
         DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
                    (int) A.vertices[0].x + A.pos.x,
                    (int) A.vertices[0].y + A.pos.y);
+    }*/
+    
+    
+    
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        asteroid a = State->Asteroids[i];
+        int j;
+        for(j = 0; j < ARRAY_SIZE(a.vertices) - 1; j++) {
+            DrawLineWu(Surface,
+                       (int)(a.vertices[j].x * cos(a.rot) - a.vertices[j].y * sin(a.rot)) + a.pos.x,
+                       (int)(a.vertices[j].x * sin(a.rot) + a.vertices[j].y * cos(a.rot)) + a.pos.y,
+                       (int)(a.vertices[j + 1].x * cos(a.rot) - a.vertices[j + 1].y * sin(a.rot)) + a.pos.x,
+                       (int)(a.vertices[j + 1].x * sin(a.rot) + a.vertices[j + 1].y * cos(a.rot) + a.pos.y));
+            
+        }
+        
+        DrawLineWu(Surface,
+                   (int)(a.vertices[j].x * cos(a.rot) - a.vertices[j].y * sin(a.rot) + a.pos.x),
+                   (int)(a.vertices[j].x * sin(a.rot) + a.vertices[j].y * cos(a.rot) + a.pos.y),
+                   (int)(a.vertices[0].x * cos(a.rot) - a.vertices[0].y * sin(a.rot) + a.pos.x),
+                   (int)(a.vertices[0].x * sin(a.rot) + a.vertices[0].y * cos(a.rot) + a.pos.y));
+        
+        
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 }
 
 
@@ -406,25 +440,29 @@ void Update(GameState* game, double dt) {
     
     //update asteroids
     for(int i = 0; i < game->AsteroidCount; i++) {
-        game->Asteroids[i].pos.x += game->Asteroids[i].vel.x * dt;
-        game->Asteroids[i].pos.y += game->Asteroids[i].vel.y * dt;
-        
-        
-        if (game->Asteroids[i].pos.x < 20) {
-            game->Asteroids[i].pos.x = SCREEN_WIDTH - 20;
+        asteroid* a = &(game->Asteroids[i]);
+        a->pos.x += a->vel.x * dt;
+        a->pos.y += a->vel.y * dt;
+        a->rot += a->rot_vel * dt;
+        if (a->rot >= 2 * M_PI) {
+            a->rot -= 2 * M_PI;
         }
         
-        if (game->Asteroids[i].pos.x > SCREEN_WIDTH - 20) {
-            game->Asteroids[i].pos.x = 20;
+        if (a->pos.x < 20) {
+            a->pos.x = SCREEN_WIDTH - 20;
+        }
+        
+        if (a->pos.x > SCREEN_WIDTH - 20) {
+            a->pos.x = 20;
         }
         
         
-        if (game->Asteroids[i].pos.y < 20) {
-            game->Asteroids[i].pos.y = SCREEN_HEIGHT - 20;
+        if (a->pos.y < 20) {
+            a->pos.y = SCREEN_HEIGHT - 20;
         }
         
-        if (game->Asteroids[i].pos.y > SCREEN_HEIGHT - 20) {
-            game->Asteroids[i].pos.y = 20;
+        if (a->pos.y > SCREEN_HEIGHT - 20) {
+            a->pos.y = 20;
         }
         
     }
@@ -464,6 +502,11 @@ void ProcessEvents() {
 }
 
 
+void DestroyAsteroid(int index) {
+    
+}
+
+
 
 
 void InitGame(GameState* State) {
@@ -485,6 +528,7 @@ void InitGame(GameState* State) {
         
         State->Asteroids[i].pos = {(float)20 * i + 100, (float)20 * i + 100};
         State->Asteroids[i].vel = {(float)1 * i, (float)1 * i};
+        State->Asteroids[i].rot_vel = 1.0f;
     }
 } 
 
