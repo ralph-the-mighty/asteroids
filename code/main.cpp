@@ -3,10 +3,11 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <stdio.h>
+#include <time.h>
 #include "enemies.h"
 #include "jmath.h"
 
-#define ANGLE M_PI * 0.01
+#define TURN_RATE M_PI * 0.01
 #define MAX_VEL 200.0f
 #define MIN_VEL 0.0f
 
@@ -36,6 +37,9 @@ KeyState Keys[1024] = {0};
 
 bool running = true;
 bool DrawAntialiased = false;
+bool paused = false;
+bool debug_mode = false;
+unsigned int frame = 0;
 
 
 
@@ -57,7 +61,7 @@ struct GameState {
 
 
 
-GameState GlobalGameState;
+GameState GlobalGameState = {0};
 
 
 
@@ -110,14 +114,26 @@ void DrawRect(SDL_Surface* Surface, int RectX, int  RectY, int RectW, int RectH,
 
 
 void PlotPoint(SDL_Surface* Surface, int X, int Y, unsigned int R, unsigned int G, unsigned int B){
+    if(X < 0) X += SCREEN_WIDTH;
+    if(Y < 0) Y +=SCREEN_HEIGHT;
+    
+    if(X >= SCREEN_WIDTH)  X -= SCREEN_WIDTH;
+    if(Y >= SCREEN_HEIGHT) Y -= SCREEN_HEIGHT;
+    
     unsigned int* Pixel = (unsigned int *)((char*)Surface->pixels + Y * Surface->pitch + X*4);
     //*Pixel = SDL_MapRGB(Surface->format, R, G, B);
-    *Pixel = (R) | (G << 8) | (B << 16);
+    *Pixel = (B) | (G << 8) | (R << 16);
 }
 
 
 
 void PlotPointBlend(SDL_Surface* Surface, int X, int Y, unsigned char Brightness) {
+    if(X < 0) X += SCREEN_WIDTH;
+    if(Y < 0) Y += SCREEN_HEIGHT;
+    
+    if(X >= SCREEN_WIDTH)  X -= SCREEN_WIDTH;
+    if(Y >= SCREEN_HEIGHT) Y -= SCREEN_HEIGHT;
+    
     unsigned int* PixelP = (unsigned int *)((char*)Surface->pixels + Y * Surface->pitch + X*4);
     if (Brightness > (unsigned char) *PixelP) {
         *PixelP = (Brightness) | (Brightness << 8) | (Brightness << 16);
@@ -334,24 +350,6 @@ void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
 
 
 void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
-    /*
-    for(int i = 0; i < State->AsteroidCount; i++) {
-        asteroid A = State->Asteroids[i];
-        int j;
-        for(j = 0; j < ARRAY_SIZE(A.vertices) - 1; j++) {
-        
-            DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
-                       (int) A.vertices[j + 1].x + A.pos.x,
-                       (int) A.vertices[j + 1].y + A.pos.y);
-        }
-        
-        DrawLineWu(Surface, (int)A.vertices[j].x + A.pos.x, (int) A.vertices[j].y + A.pos.y,
-                   (int) A.vertices[0].x + A.pos.x,
-                   (int) A.vertices[0].y + A.pos.y);
-    }*/
-    
-    
-    
     for(int i = 0; i < State->AsteroidCount; i++) {
         asteroid a = State->Asteroids[i];
         int j;
@@ -370,30 +368,47 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
                    (int)(a.vertices[0].x * cos(a.rot) - a.vertices[0].y * sin(a.rot) + a.pos.x),
                    (int)(a.vertices[0].x * sin(a.rot) + a.vertices[0].y * cos(a.rot) + a.pos.y));
         
-        
+        if(debug_mode) {
+            PlotPoint(Surface, a.pos.x, a.pos.y, 255, 0, 0); 
+            PlotPoint(Surface, a.pos.x, a.pos.y + 1, 255, 0, 0); 
+            PlotPoint(Surface, a.pos.x, a.pos.y - 1, 255, 0, 0); 
+            PlotPoint(Surface, a.pos.x + 1, a.pos.y, 255, 0, 0); 
+            PlotPoint(Surface, a.pos.x - 1, a.pos.y, 255, 0, 0); 
+        }
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 }
 
 
 
 void Update(GameState* game, double dt) {
+    frame++;
     
-    //ProcessInput(game, Surface);
+    if(Keys[SDL_SCANCODE_S].isDown && !Keys[SDL_SCANCODE_S].wasDown) {
+        DrawAntialiased = !DrawAntialiased;
+    }
+    
+    if(Keys[SDL_SCANCODE_P].isDown && !Keys[SDL_SCANCODE_P].wasDown) {
+        paused = !paused;
+    }
+    
+    
+    if(Keys[SDL_SCANCODE_D].isDown && !Keys[SDL_SCANCODE_D].wasDown) {
+        debug_mode = !debug_mode;
+    }
+    
+    if(Keys[SDL_SCANCODE_SPACE].isDown && !Keys[SDL_SCANCODE_SPACE].wasDown && paused) {
+        printf("STEP!");
+        goto updateplayer;
+    }
+    
+    if (paused) return;
+    
+    updateplayer:
+    //update player
     if(Keys[SDL_SCANCODE_LEFT].isDown) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(-ANGLE) - GlobalGameState.player.rotation.y * sin(-ANGLE);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(-ANGLE) + GlobalGameState.player.rotation.y * cos(-ANGLE);
+        NewRotation.x = GlobalGameState.player.rotation.x * cos(-TURN_RATE) - GlobalGameState.player.rotation.y * sin(-TURN_RATE);
+        NewRotation.y = GlobalGameState.player.rotation.x * sin(-TURN_RATE) + GlobalGameState.player.rotation.y * cos(-TURN_RATE);
         
         GlobalGameState.player.rotation = NewRotation;
         
@@ -401,8 +416,8 @@ void Update(GameState* game, double dt) {
     
     if(Keys[SDL_SCANCODE_RIGHT].isDown) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(ANGLE) - GlobalGameState.player.rotation.y * sin(ANGLE);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(ANGLE) + GlobalGameState.player.rotation.y * cos(ANGLE);
+        NewRotation.x = GlobalGameState.player.rotation.x * cos(TURN_RATE) - GlobalGameState.player.rotation.y * sin(TURN_RATE);
+        NewRotation.y = GlobalGameState.player.rotation.x * sin(TURN_RATE) + GlobalGameState.player.rotation.y * cos(TURN_RATE);
         
         GlobalGameState.player.rotation = NewRotation;
     }
@@ -413,32 +428,17 @@ void Update(GameState* game, double dt) {
         }
     }
     
-    if(Keys[SDL_SCANCODE_S].isDown && !Keys[SDL_SCANCODE_S].wasDown) {
-        DrawAntialiased = !DrawAntialiased;
-    }
-    
-    //update player
     game->player.pos.x += game->player.vel.x * dt;
     game->player.pos.y += game->player.vel.y * dt;
     
-    if (game->player.pos.x < 20) {
-        game->player.pos.x = SCREEN_WIDTH - 20;
-    }
+    if (game->player.pos.x < 0) game->player.pos.x += SCREEN_WIDTH;
+    if (game->player.pos.x >= SCREEN_WIDTH) game->player.pos.x -= SCREEN_WIDTH;
+    if (game->player.pos.y < 0) game->player.pos.y += SCREEN_HEIGHT;
+    if (game->player.pos.y >= SCREEN_HEIGHT) game->player.pos.y -= SCREEN_HEIGHT;
     
-    if (game->player.pos.x > SCREEN_WIDTH - 20) {
-        game->player.pos.x = 20;
-    }
-    
-    
-    if (game->player.pos.y < 20) {
-        game->player.pos.y = SCREEN_HEIGHT - 20;
-    }
-    
-    if (game->player.pos.y > SCREEN_HEIGHT - 20) {
-        game->player.pos.y = 20;
-    }
     
     //update asteroids
+    // TODO(JOSH): Find the bug where the positions dont update correctly at the edges
     for(int i = 0; i < game->AsteroidCount; i++) {
         asteroid* a = &(game->Asteroids[i]);
         a->pos.x += a->vel.x * dt;
@@ -448,22 +448,11 @@ void Update(GameState* game, double dt) {
             a->rot -= 2 * M_PI;
         }
         
-        if (a->pos.x < 20) {
-            a->pos.x = SCREEN_WIDTH - 20;
-        }
+        if(a->pos.x < 0) a->pos.x += SCREEN_WIDTH;
+        if(a->pos.y < 0) a->pos.y += SCREEN_HEIGHT;
         
-        if (a->pos.x > SCREEN_WIDTH - 20) {
-            a->pos.x = 20;
-        }
-        
-        
-        if (a->pos.y < 20) {
-            a->pos.y = SCREEN_HEIGHT - 20;
-        }
-        
-        if (a->pos.y > SCREEN_HEIGHT - 20) {
-            a->pos.y = 20;
-        }
+        if(a->pos.x >= SCREEN_WIDTH)  a->pos.x -= SCREEN_WIDTH;
+        if(a->pos.y >= SCREEN_HEIGHT) a->pos.y -= SCREEN_HEIGHT;
         
     }
 }
@@ -508,6 +497,35 @@ void DestroyAsteroid(int index) {
 
 
 
+void GenAsteroids(GameState* State, int count) {
+    if (State->Asteroids)
+        free(State->Asteroids);
+    State->AsteroidCount = count;
+    
+    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        asteroid* a = &(State->Asteroids[i]);
+        
+        
+        a->size = 20;
+        
+        for (int j = 0; j < 6; j++){
+            
+            float angle = j * (2 * M_PI) / 5;
+            a->vertices[j].x = cos(angle) * (randf() * (a->size / 2)) + a->size / 2;
+            a->vertices[j].y = sin(angle) * (randf() * (a->size / 2)) + a->size / 2;
+            
+            a->vertices[j] = {(float)cos(angle) * 10 + randf() * 5, (float)sin(angle) * 10 + randf() * 5};
+            
+        }
+        
+        a->pos = {20 + randf() * (SCREEN_WIDTH - 40), 20 + (SCREEN_HEIGHT - 40) };
+        a->vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
+        a->rot_vel = randf() * 5 - 5;
+    }
+}
+
+
 
 void InitGame(GameState* State) {
     State->player.pos = V2(320, 240);
@@ -515,29 +533,38 @@ void InitGame(GameState* State) {
     State->player.rotation = {0};
     State->player.rotation.y = 1;
     
-    
-    State->AsteroidCount = 5;
-    
-    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
-    for(int i = 0; i < State->AsteroidCount; i++) {
-        State->Asteroids[i].vertices[0] = {-5,-5};
-        State->Asteroids[i].vertices[1] = {-5,5};
-        State->Asteroids[i].vertices[2] = {0,7};
-        State->Asteroids[i].vertices[3] = {5,5};
-        State->Asteroids[i].vertices[4] = {5,-5};
-        
-        State->Asteroids[i].pos = {(float)20 * i + 100, (float)20 * i + 100};
-        State->Asteroids[i].vel = {(float)1 * i, (float)1 * i};
-        State->Asteroids[i].rot_vel = 1.0f;
-    }
+    GenAsteroids(State, 5);
 } 
 
+
+
+
+void WriteDebugStats(GameState* State) {
+    FILE* file = fopen("debug.txt", "w");
+    fprintf(file, "DEBUG INFO FRAME %d\n\n", frame);
+    fprintf(file, "Player info:\n");
+    fprintf(file, "  %f, %f", State->player.pos.x, State->player.pos.y);
+    fprintf(file, "\nAsteroid info:\n");
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        asteroid a = State->Asteroids[i];
+        fprintf(file, "  %i: %f, %f\n", i, a.pos.x, a.pos.y); 
+    }
+    fclose(file);
+}
+/*
+void EraseDebugStats(){
+    remove
+}
+
+*/
 
 
 int main( int argc, char* args[] ) {
     if(!init()){
         return 0;
     }
+    
+    srand(time(NULL));
     
     InitGame(&GlobalGameState);
     
@@ -558,13 +585,13 @@ int main( int argc, char* args[] ) {
         while(accumulator >= dt) {
             ProcessEvents();
             Update(&GlobalGameState, dt);
+            WriteDebugStats(&GlobalGameState);
             accumulator -= dt;
         }
         
         Draw(&GlobalGameState, gScreenSurface);
         SDL_UpdateWindowSurface(gWindow);
     }
-    
     close();
     return 0;
 }

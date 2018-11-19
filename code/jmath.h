@@ -3,6 +3,8 @@
 #define JMATH_H_INCLUDEGUARD
 
 #include "math.h"
+#include "stdlib.h"
+
 
 
 //general utility
@@ -27,6 +29,10 @@ inline float Round(float f) {
 }
 
 
+
+float randf() {
+    return (float)rand() / (RAND_MAX + 1.0f);
+}
 
 
 
