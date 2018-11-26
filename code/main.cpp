@@ -36,7 +36,6 @@ SDL_Surface* gScreenSurface = NULL;
 KeyState Keys[1024] = {0};
 
 bool running = true;
-bool DrawAntialiased = false;
 bool paused = false;
 bool debug_mode = false;
 unsigned int frame = 0;
@@ -317,7 +316,7 @@ void DrawLineWu(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1) {
 
 
 
-void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
+void DrawPlayer(SDL_Surface* Surface, Player* player) {
     
     v2 Point1 = {0};
     v2 Point2 = {0};
@@ -333,17 +332,11 @@ void DrawPlayer(SDL_Surface* Surface, Player* player, bool AntiAliased) {
     Point3 = player->pos + player->rotation * 15;
     
     
-    if(AntiAliased) {
-        
-        DrawLineWu(Surface, Round(Point1.x), Round(Point1.y), Round(Point2.x), Round(Point2.y));
-        DrawLineWu(Surface, Round( Point2.x), Round(Point2.y), Round(Point3.x), Round(Point3.y));
-        DrawLineWu(Surface, Round(Point3.x), Round(Point3.y), Round(Point1.x), Round(Point1.y));
-    } else {
-        
-        DrawLineBresenham(Surface, (int) Point1.x, (int) Point1.y, (int) Point2.x, (int) Point2.y, 0xff, 0xff, 0xff);
-        DrawLineBresenham(Surface, (int) Point2.x, (int) Point2.y, (int) Point3.x, (int) Point3.y, 0xff, 0xff, 0xff);
-        DrawLineBresenham(Surface, (int) Point3.x, (int) Point3.y, (int) Point1.x, (int) Point1.y, 0xff, 0xff, 0xff);
-    }
+    
+    DrawLineWu(Surface, Round(Point1.x), Round(Point1.y), Round(Point2.x), Round(Point2.y));
+    DrawLineWu(Surface, Round( Point2.x), Round(Point2.y), Round(Point3.x), Round(Point3.y));
+    DrawLineWu(Surface, Round(Point3.x), Round(Point3.y), Round(Point1.x), Round(Point1.y));
+    
     
 }
 
@@ -383,9 +376,6 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
 void Update(GameState* game, double dt) {
     frame++;
     
-    if(Keys[SDL_SCANCODE_S].isDown && !Keys[SDL_SCANCODE_S].wasDown) {
-        DrawAntialiased = !DrawAntialiased;
-    }
     
     if(Keys[SDL_SCANCODE_P].isDown && !Keys[SDL_SCANCODE_P].wasDown) {
         paused = !paused;
@@ -462,7 +452,7 @@ void Draw(GameState* game, SDL_Surface* Surface) {
     //Drawing
     SDL_FillRect(Surface, NULL, SDL_MapRGB(Surface->format, 0, 0, 0));
     DrawAsteroids(Surface, &GlobalGameState);
-    DrawPlayer(Surface, &(game->player), DrawAntialiased);
+    DrawPlayer(Surface, &(game->player));
 }
 
 void ProcessEvents() {
