@@ -93,6 +93,81 @@ void close() {
 }
 
 
+bool IsConvex(v2* poly, int n) {
+    
+    v2 p0 = poly[0];
+    v2 p1 = poly[1];
+    v2 p2 = poly[2];
+    v2 d1 = p1 - p0;
+    v2 d2 = p2 - p1;
+    bool firstsign = (d1.x * d2.y - d1.y * d2.x) >= 0 ? true : false;
+    
+    for(int i = 1; i < n; i++){
+        p0 = poly[i];
+        p1 = poly[(i + 1) % n];
+        p2 = poly[(i + 2) % n];
+        
+        d1 = p1 - p0;
+        d2 = p2 - p1;
+        
+        bool nextsign = (d1.x * d2.y - d1.y * d2.x) >= 0 ? true : false;
+        
+        if (nextsign != firstsign) return false;
+    }
+    return true;
+}
+
+
+void GenAsteroids(GameState* State, int count) {
+    if (State->Asteroids)
+        free(State->Asteroids);
+    State->AsteroidCount = count;
+    
+    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
+    for(int i = 0; i < State->AsteroidCount; i++) {
+        
+        gen_vertices:
+        
+        asteroid* a = &(State->Asteroids[i]);
+        a->size = 50;
+        for (int j = 0; j < 6; j++){
+            
+            float angle = j * (2 * M_PI) / 5;
+            a->vertices[j] = {(float)cos(angle) * (randf() * a->size), (float)sin(angle) * (randf() * a->size)};            
+        }
+        
+        if(!IsConvex(a->vertices, 5)) {
+            goto gen_vertices;
+        }
+        
+        
+        //adjust points so that origin is center of gravity;
+        
+        v2 sum = {0};
+        float f;
+        float twicearea = 0;
+        
+        for(int k = 0; k < 5; k++) {
+            v2 p1 = a->vertices[k];
+            v2 p2 = a->vertices[(k + 1) % 5];
+            f = (p1.x * p2.y - p2.x * p1.y);
+            sum.x += (p1.x + p2.x) * f;
+            sum.y += (p1.y + p2.y) * f;
+            twicearea += f;
+        }
+        
+        a->pos.x -= (sum.x / (twicearea * 3));
+        a->pos.y -= (sum.y / (twicearea * 3));
+        
+        
+        a->pos = {20 + randf() * (SCREEN_WIDTH - 40), 20 + (SCREEN_HEIGHT - 40) };
+        a->vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
+        a->rot_vel = randf() * 5 - 5;
+    }
+}
+
+
+
 
 void DrawRect(SDL_Surface* Surface, int RectX, int  RectY, int RectW, int RectH, unsigned char R, unsigned char G, unsigned char B) {
     
@@ -337,7 +412,15 @@ void DrawPlayer(SDL_Surface* Surface, Player* player) {
     DrawLineWu(Surface, Round( Point2.x), Round(Point2.y), Round(Point3.x), Round(Point3.y));
     DrawLineWu(Surface, Round(Point3.x), Round(Point3.y), Round(Point1.x), Round(Point1.y));
     
-    
+}
+
+
+void DrawMarker(SDL_Surface *Surface, int x, int y, int R, int G, int B) {
+    PlotPoint(Surface, x, y, R, G, B); 
+    PlotPoint(Surface, x, y + 1, R, G, B); 
+    PlotPoint(Surface, x, y - 1, R, G, B); 
+    PlotPoint(Surface, x + 1, y, R, G, B); 
+    PlotPoint(Surface, x - 1, y, R, G, B);
 }
 
 
@@ -361,12 +444,32 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
                    (int)(a.vertices[0].x * cos(a.rot) - a.vertices[0].y * sin(a.rot) + a.pos.x),
                    (int)(a.vertices[0].x * sin(a.rot) + a.vertices[0].y * cos(a.rot) + a.pos.y));
         
-        if(debug_mode) {
-            PlotPoint(Surface, a.pos.x, a.pos.y, 255, 0, 0); 
-            PlotPoint(Surface, a.pos.x, a.pos.y + 1, 255, 0, 0); 
-            PlotPoint(Surface, a.pos.x, a.pos.y - 1, 255, 0, 0); 
-            PlotPoint(Surface, a.pos.x + 1, a.pos.y, 255, 0, 0); 
-            PlotPoint(Surface, a.pos.x - 1, a.pos.y, 255, 0, 0); 
+        
+        if(debug_mode) { 
+            
+            DrawMarker(Surface, (int)a.pos.x, (int)a.pos.y, 255, 0, 0);
+            
+            v2 center = {0};
+            v2 sum = {0};
+            float f;
+            float twicearea = 0;
+            
+            for(int k = 0; k < 5; k++) {
+                v2 p1 = a.vertices[k];
+                v2 p2 = a.vertices[(k + 1) % 5];
+                f = (p1.x * p2.y - p2.x * p1.y);
+                sum.x += (p1.x + p2.x) * f;
+                sum.y += (p1.y + p2.y) * f;
+                twicearea += f;
+            }
+            
+            center.x = (sum.x / (twicearea * 3));
+            center.y = (sum.y / (twicearea * 3));
+            
+            
+            DrawMarker(Surface, (int)(a.pos.x - center.x), (int)(a.pos.y + center.y), 255, 0, 255);
+            DrawMarker(Surface, 10, 10, 255, 255, 255);
+            
         }
     }
 }
@@ -391,7 +494,16 @@ void Update(GameState* game, double dt) {
         goto updateplayer;
     }
     
+    
+    if(Keys[SDL_SCANCODE_G].isDown && !Keys[SDL_SCANCODE_G].wasDown) {
+        GenAsteroids(&GlobalGameState, 5);
+    }
+    
     if (paused) return;
+    
+    
+    
+    
     
     updateplayer:
     //update player
@@ -417,6 +529,8 @@ void Update(GameState* game, double dt) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
         }
     }
+    
+    
     
     game->player.pos.x += game->player.vel.x * dt;
     game->player.pos.y += game->player.vel.y * dt;
@@ -484,37 +598,6 @@ void ProcessEvents() {
 void DestroyAsteroid(int index) {
     
 }
-
-
-
-void GenAsteroids(GameState* State, int count) {
-    if (State->Asteroids)
-        free(State->Asteroids);
-    State->AsteroidCount = count;
-    
-    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
-    for(int i = 0; i < State->AsteroidCount; i++) {
-        asteroid* a = &(State->Asteroids[i]);
-        
-        
-        a->size = 20;
-        
-        for (int j = 0; j < 6; j++){
-            
-            float angle = j * (2 * M_PI) / 5;
-            a->vertices[j].x = cos(angle) * (randf() * (a->size / 2)) + a->size / 2;
-            a->vertices[j].y = sin(angle) * (randf() * (a->size / 2)) + a->size / 2;
-            
-            a->vertices[j] = {(float)cos(angle) * 10 + randf() * 5, (float)sin(angle) * 10 + randf() * 5};
-            
-        }
-        
-        a->pos = {20 + randf() * (SCREEN_WIDTH - 40), 20 + (SCREEN_HEIGHT - 40) };
-        a->vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
-        a->rot_vel = randf() * 5 - 5;
-    }
-}
-
 
 
 void InitGame(GameState* State) {

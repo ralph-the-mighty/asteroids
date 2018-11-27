@@ -99,6 +99,10 @@ inline v2 normalize(v2 v) {
     return v;
 }
 
+inline float dot(v2 u, v2 v) {
+    return u.x * v.x + u.y * v.y;
+}
+
 
 //v3 vectors
 
