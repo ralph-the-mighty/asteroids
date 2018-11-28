@@ -4,11 +4,15 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <time.h>
-#include "enemies.h"
-#include "jmath.h"
+#include <assert.h>
+#include <string.h>
 
-#define TURN_RATE M_PI * 0.01
-#define MAX_VEL 200.0f
+#include "entities.h"
+#include "jmath.h"
+#include "array.cpp"
+
+#define TURN_RATE M_PI * 0.015f
+#define MAX_VEL 400.0f
 #define MIN_VEL 0.0f
 
 
@@ -61,6 +65,7 @@ struct GameState {
 
 
 GameState GlobalGameState = {0};
+
 
 
 
@@ -474,6 +479,23 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
 
 
 
+
+void DestroyAsteroid(int index) {
+    assert(index < GlobalGameState.AsteroidCount);
+    assert(GlobalGameState.AsteroidCount > 0);
+    
+    asteroid* NewAsteroids = (asteroid*) malloc(sizeof(asteroid) * GlobalGameState.AsteroidCount - 1);
+    for(int i = 0; i < GlobalGameState.AsteroidCount; i++) {
+        if (i == index) continue;
+        memcpy(&NewAsteroids[i], &GlobalGameState.Asteroids[i], sizeof(asteroid)); 
+    }
+    free(GlobalGameState.Asteroids);
+    GlobalGameState.Asteroids = NewAsteroids;
+    GlobalGameState.AsteroidCount--;
+}
+
+
+
 void Update(GameState* game, double dt) {
     frame++;
     
@@ -496,9 +518,11 @@ void Update(GameState* game, double dt) {
         GenAsteroids(&GlobalGameState, 5);
     }
     
+    if(Keys[SDL_SCANCODE_K].isDown && !Keys[SDL_SCANCODE_K].wasDown) {
+        DestroyAsteroid(0);
+    }
+    
     if (paused) return;
-    
-    
     
     
     
@@ -592,10 +616,6 @@ void ProcessEvents() {
 }
 
 
-void DestroyAsteroid(int index) {
-    
-}
-
 
 void InitGame(GameState* State) {
     State->player.pos = V2(320, 240);
@@ -629,10 +649,43 @@ remove
 */
 
 
+void test() {
+#define NUM 16
+    array<int> a;
+    a.init();
+    
+    for(int i = 0; i < NUM; i++) {
+        a.insert(i);
+    }
+    
+    for(int i = 0; i < a.length; i++) {
+        assert(a[i] == i);
+    }
+    
+    for(int i = 0; i < NUM; i++) {
+        a.remove(0);
+    }
+    
+    
+    
+    for(int i = 0; i < NUM; i++) {
+        a.insert(i);
+    }
+    
+    a.insert(100);
+    a.destroy();
+}
+
+
+
+
 int main( int argc, char* args[] ) {
     if(!init()){
         return 0;
     }
+    
+    test();
+    
     
     srand(time(NULL));
     
