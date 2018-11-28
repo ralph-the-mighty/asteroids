@@ -393,6 +393,14 @@ void DrawLineWu(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1) {
 
 
 
+void DrawTriangle(SDL_Surface* Surface, v2 p1, v2 p2, v2 p3) {
+    DrawLineWu(Surface, Round(p1.x), Round(p1.y), Round(p2.x), Round(p2.y));
+    DrawLineWu(Surface, Round( p2.x), Round(p2.y), Round(p3.x), Round(p3.y));
+    DrawLineWu(Surface, Round(p3.x), Round(p3.y), Round(p1.x), Round(p1.y));
+}
+
+
+
 void DrawPlayer(SDL_Surface* Surface, Player* player) {
     
     v2 Point1 = {0};
@@ -409,10 +417,21 @@ void DrawPlayer(SDL_Surface* Surface, Player* player) {
     Point3 = player->pos + player->rotation * 15;
     
     
+    DrawTriangle(Surface, Point1, Point2, Point3);
     
-    DrawLineWu(Surface, Round(Point1.x), Round(Point1.y), Round(Point2.x), Round(Point2.y));
-    DrawLineWu(Surface, Round( Point2.x), Round(Point2.y), Round(Point3.x), Round(Point3.y));
-    DrawLineWu(Surface, Round(Point3.x), Round(Point3.y), Round(Point1.x), Round(Point1.y));
+    
+    
+    //draw flame
+    
+    if(Keys[SDL_SCANCODE_UP].isDown && (frame % 2) == 0) {
+        v2 p1 = Point1 - (player->rotation * 2) - PerpRotation * 3;
+        v2 p2 = Point2 - (player->rotation * 2) + PerpRotation * 3;
+        v2 p3 = player->pos - (player->rotation * 10);
+        
+        DrawTriangle(Surface, p1, p2, p3);
+    }
+    
+    
     
 }
 
