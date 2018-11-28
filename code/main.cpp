@@ -125,23 +125,22 @@ void GenAsteroids(GameState* State, int count) {
     
     State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
     for(int i = 0; i < State->AsteroidCount; i++) {
-        
-        gen_vertices:
-        
         asteroid* a = &(State->Asteroids[i]);
         a->size = 50;
-        for (int j = 0; j < 6; j++){
+        
+        do {
+            for (int j = 0; j < 6; j++){
+                float angle = j * (2 * M_PI) / 5;
+                a->vertices[j] = {(float)cos(angle) * (randf() * a->size), (float)sin(angle) * (randf() * a->size)};
+            }
             
-            float angle = j * (2 * M_PI) / 5;
-            a->vertices[j] = {(float)cos(angle) * (randf() * a->size), (float)sin(angle) * (randf() * a->size)};            
-        }
+        } while(!IsConvex(a->vertices, 5));
         
-        if(!IsConvex(a->vertices, 5)) {
-            goto gen_vertices;
-        }
         
+        a->pos = { randf() * SCREEN_WIDTH, randf() * SCREEN_HEIGHT };
         
         //adjust points so that origin is center of gravity;
+        
         
         v2 sum = {0};
         float f;
@@ -156,13 +155,16 @@ void GenAsteroids(GameState* State, int count) {
             twicearea += f;
         }
         
-        a->pos.x -= (sum.x / (twicearea * 3));
-        a->pos.y -= (sum.y / (twicearea * 3));
+        for(int k = 0; k < 5; k++) {
+            a->vertices[k].x -= (sum.x / (twicearea * 3));
+            a->vertices[k].y -= (sum.y / (twicearea * 3));
+        }
         
         
-        a->pos = {20 + randf() * (SCREEN_WIDTH - 40), 20 + (SCREEN_HEIGHT - 40) };
+        
         a->vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
         a->rot_vel = randf() * 5 - 5;
+        
     }
 }
 
@@ -446,30 +448,7 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
         
         
         if(debug_mode) { 
-            
             DrawMarker(Surface, (int)a.pos.x, (int)a.pos.y, 255, 0, 0);
-            
-            v2 center = {0};
-            v2 sum = {0};
-            float f;
-            float twicearea = 0;
-            
-            for(int k = 0; k < 5; k++) {
-                v2 p1 = a.vertices[k];
-                v2 p2 = a.vertices[(k + 1) % 5];
-                f = (p1.x * p2.y - p2.x * p1.y);
-                sum.x += (p1.x + p2.x) * f;
-                sum.y += (p1.y + p2.y) * f;
-                twicearea += f;
-            }
-            
-            center.x = (sum.x / (twicearea * 3));
-            center.y = (sum.y / (twicearea * 3));
-            
-            
-            DrawMarker(Surface, (int)(a.pos.x - center.x), (int)(a.pos.y + center.y), 255, 0, 255);
-            DrawMarker(Surface, 10, 10, 255, 255, 255);
-            
         }
     }
 }
@@ -490,7 +469,6 @@ void Update(GameState* game, double dt) {
     }
     
     if(Keys[SDL_SCANCODE_SPACE].isDown && !Keys[SDL_SCANCODE_SPACE].wasDown && paused) {
-        printf("STEP!");
         goto updateplayer;
     }
     
@@ -626,7 +604,7 @@ void WriteDebugStats(GameState* State) {
 }
 /*
 void EraseDebugStats(){
-    remove
+remove
 }
 
 */
