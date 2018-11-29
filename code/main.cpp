@@ -57,9 +57,8 @@ struct Player {
 struct GameState {
     Player player;
     int score;
-    
-    asteroid* Asteroids;
-    unsigned int AsteroidCount;
+    array<asteroid> Asteroids;
+    array<bullet> Bullets;
 };
 
 
@@ -69,7 +68,7 @@ GameState GlobalGameState = {0};
 
 
 
-bool init(){
+bool SDL_Init(){
     bool success = true;
     
     //Initialize SDL
@@ -124,25 +123,23 @@ bool IsConvex(v2* poly, int n) {
 
 
 void GenAsteroids(GameState* State, int count) {
-    if (State->Asteroids)
-        free(State->Asteroids);
-    State->AsteroidCount = count;
+    State->Asteroids.destroy();
+    State->Asteroids.init();
     
-    State->Asteroids = (asteroid*)malloc(sizeof(asteroid) * State->AsteroidCount);
-    for(int i = 0; i < State->AsteroidCount; i++) {
-        asteroid* a = &(State->Asteroids[i]);
-        a->size = 50;
+    for(int i = 0; i < count; i++) {
+        asteroid a = {0}; 
+        a.size = 50;
         
         do {
             for (int j = 0; j < 6; j++){
                 float angle = j * (2 * M_PI) / 5;
-                a->vertices[j] = {(float)cos(angle) * (randf() * a->size), (float)sin(angle) * (randf() * a->size)};
+                a.vertices[j] = {(float)cos(angle) * (randf() * a.size), (float)sin(angle) * (randf() * a.size)};
             }
             
-        } while(!IsConvex(a->vertices, 5));
+        } while(!IsConvex(a.vertices, 5));
         
         
-        a->pos = { randf() * SCREEN_WIDTH, randf() * SCREEN_HEIGHT };
+        a.pos = { randf() * SCREEN_WIDTH, randf() * SCREEN_HEIGHT };
         
         //adjust points so that origin is center of gravity;
         
@@ -152,8 +149,8 @@ void GenAsteroids(GameState* State, int count) {
         float twicearea = 0;
         
         for(int k = 0; k < 5; k++) {
-            v2 p1 = a->vertices[k];
-            v2 p2 = a->vertices[(k + 1) % 5];
+            v2 p1 = a.vertices[k];
+            v2 p2 = a.vertices[(k + 1) % 5];
             f = (p1.x * p2.y - p2.x * p1.y);
             sum.x += (p1.x + p2.x) * f;
             sum.y += (p1.y + p2.y) * f;
@@ -161,14 +158,14 @@ void GenAsteroids(GameState* State, int count) {
         }
         
         for(int k = 0; k < 5; k++) {
-            a->vertices[k].x -= (sum.x / (twicearea * 3));
-            a->vertices[k].y -= (sum.y / (twicearea * 3));
+            a.vertices[k].x -= (sum.x / (twicearea * 3));
+            a.vertices[k].y -= (sum.y / (twicearea * 3));
         }
         
+        a.vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
+        a.rot_vel = randf() * 5 - 5;
         
-        
-        a->vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
-        a->rot_vel = randf() * 5 - 5;
+        State->Asteroids.insert(a);
         
     }
 }
@@ -452,7 +449,7 @@ void DrawMarker(SDL_Surface *Surface, int x, int y, int R, int G, int B) {
 
 
 void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
-    for(int i = 0; i < State->AsteroidCount; i++) {
+    for(int i = 0; i < State->Asteroids.length; i++) {
         asteroid a = State->Asteroids[i];
         int j;
         for(j = 0; j < ARRAY_SIZE(a.vertices) - 1; j++) {
@@ -478,24 +475,6 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
 }
 
 
-
-
-void DestroyAsteroid(int index) {
-    assert(index < GlobalGameState.AsteroidCount);
-    assert(GlobalGameState.AsteroidCount > 0);
-    
-    asteroid* NewAsteroids = (asteroid*) malloc(sizeof(asteroid) * GlobalGameState.AsteroidCount - 1);
-    for(int i = 0; i < GlobalGameState.AsteroidCount; i++) {
-        if (i == index) continue;
-        memcpy(&NewAsteroids[i], &GlobalGameState.Asteroids[i], sizeof(asteroid)); 
-    }
-    free(GlobalGameState.Asteroids);
-    GlobalGameState.Asteroids = NewAsteroids;
-    GlobalGameState.AsteroidCount--;
-}
-
-
-
 void Update(GameState* game, double dt) {
     frame++;
     
@@ -519,7 +498,7 @@ void Update(GameState* game, double dt) {
     }
     
     if(Keys[SDL_SCANCODE_K].isDown && !Keys[SDL_SCANCODE_K].wasDown) {
-        DestroyAsteroid(0);
+        game->Asteroids.remove(0);
     }
     
     if (paused) return;
@@ -544,6 +523,7 @@ void Update(GameState* game, double dt) {
         
         GlobalGameState.player.rotation = NewRotation;
     }
+    
     if(Keys[SDL_SCANCODE_UP].isDown) {
         GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 5;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
@@ -564,7 +544,7 @@ void Update(GameState* game, double dt) {
     
     //update asteroids
     // TODO(JOSH): Find the bug where the positions dont update correctly at the edges
-    for(int i = 0; i < game->AsteroidCount; i++) {
+    for(int i = 0; i < game->Asteroids.length; i++) {
         asteroid* a = &(game->Asteroids[i]);
         a->pos.x += a->vel.x * dt;
         a->pos.y += a->vel.y * dt;
@@ -635,7 +615,7 @@ void WriteDebugStats(GameState* State) {
     fprintf(file, "Player info:\n");
     fprintf(file, "  %f, %f", State->player.pos.x, State->player.pos.y);
     fprintf(file, "\nAsteroid info:\n");
-    for(int i = 0; i < State->AsteroidCount; i++) {
+    for(int i = 0; i < State->Asteroids.length; i++) {
         asteroid a = State->Asteroids[i];
         fprintf(file, "  %i: %f, %f\n", i, a.pos.x, a.pos.y); 
     }
@@ -680,7 +660,7 @@ void test() {
 
 
 int main( int argc, char* args[] ) {
-    if(!init()){
+    if(!SDL_Init()){
         return 0;
     }
     
