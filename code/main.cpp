@@ -64,6 +64,7 @@ struct GameState {
     Player player;
     int score;
     array<asteroid> Asteroids;
+    array<bullet> Bullets;
 };
 
 
@@ -202,7 +203,6 @@ void PlotPoint(SDL_Surface* Surface, int X, int Y, unsigned int R, unsigned int 
     
     if(X >= SCREEN_WIDTH)  X -= SCREEN_WIDTH;
     if(Y >= SCREEN_HEIGHT) Y -= SCREEN_HEIGHT;
-    
     unsigned int* Pixel = (unsigned int *)((char*)Surface->pixels + Y * Surface->pitch + X*4);
     //*Pixel = SDL_MapRGB(Surface->format, R, G, B);
     *Pixel = (B) | (G << 8) | (R << 16);
@@ -480,6 +480,18 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
 }
 
 
+inline void WrapPosition(v2* pos) {
+    
+    if(pos->x < 0) pos->x += SCREEN_WIDTH;
+    if(pos->y < 0) pos->y += SCREEN_HEIGHT;
+    
+    if(pos->x >= SCREEN_WIDTH)  pos->x -= SCREEN_WIDTH;
+    if(pos->y >= SCREEN_HEIGHT) pos->y -= SCREEN_HEIGHT;
+}
+
+
+
+
 void Update(GameState* game, double dt) {
     frame++;
     
@@ -514,37 +526,41 @@ void Update(GameState* game, double dt) {
     //update player
     if(ISDOWN(LEFT)) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(-TURN_RATE * dt) - GlobalGameState.player.rotation.y * sin(-TURN_RATE * dt);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(-TURN_RATE * dt) + GlobalGameState.player.rotation.y * cos(-TURN_RATE * dt);
+        NewRotation.x = game->player.rotation.x * cos(-TURN_RATE * dt) - game->player.rotation.y * sin(-TURN_RATE * dt);
+        NewRotation.y = game->player.rotation.x * sin(-TURN_RATE * dt) + game->player.rotation.y * cos(-TURN_RATE * dt);
         
-        GlobalGameState.player.rotation = NewRotation;
+        game->player.rotation = NewRotation;
         
     }
     
     if(ISDOWN(RIGHT)) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(TURN_RATE * dt) - GlobalGameState.player.rotation.y * sin(TURN_RATE * dt);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(TURN_RATE * dt) + GlobalGameState.player.rotation.y * cos(TURN_RATE * dt);
+        NewRotation.x = game->player.rotation.x * cos(TURN_RATE * dt) - game->player.rotation.y * sin(TURN_RATE * dt);
+        NewRotation.y = game->player.rotation.x * sin(TURN_RATE * dt) + game->player.rotation.y * cos(TURN_RATE * dt);
         
-        GlobalGameState.player.rotation = NewRotation;
+        game->player.rotation = NewRotation;
     }
+    
     if(ISDOWN(UP)) {
-        
-        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * THRUST_VEL * dt;
-        if (length(GlobalGameState.player.vel) > MAX_VEL) {
-            GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
+        game->player.vel = game->player.vel + game->player.rotation * THRUST_VEL * dt;
+        if (length(game->player.vel) > MAX_VEL) {
+            game->player.vel = normalize(game->player.vel) * MAX_VEL;
         }
+    }
+    
+    if(CAMEDOWN(SPACE)) {
+        bullet Bullet = {0};
+        Bullet.lifetime = 2.0f;
+        Bullet.pos = game->player.pos + game->player.rotation * 15;
+        Bullet.vel = (game->player.rotation * 200);
+        game->Bullets.insert(Bullet);
     }
     
     
     
     game->player.pos.x += game->player.vel.x * dt;
     game->player.pos.y += game->player.vel.y * dt;
-    
-    if (game->player.pos.x < 0) game->player.pos.x += SCREEN_WIDTH;
-    if (game->player.pos.x >= SCREEN_WIDTH) game->player.pos.x -= SCREEN_WIDTH;
-    if (game->player.pos.y < 0) game->player.pos.y += SCREEN_HEIGHT;
-    if (game->player.pos.y >= SCREEN_HEIGHT) game->player.pos.y -= SCREEN_HEIGHT;
+    WrapPosition(&(game->player.pos));
     
     
     //update asteroids
@@ -558,12 +574,39 @@ void Update(GameState* game, double dt) {
             a->rot -= 2 * M_PI;
         }
         
-        if(a->pos.x < 0) a->pos.x += SCREEN_WIDTH;
-        if(a->pos.y < 0) a->pos.y += SCREEN_HEIGHT;
+        WrapPosition(&(a->pos));
+    }
+    
+    
+    
+    //update bullets
+    
+    for(int i = 0; i < game->Bullets.length; i++) {
+        game->Bullets[i].lifetime -= dt;
         
-        if(a->pos.x >= SCREEN_WIDTH)  a->pos.x -= SCREEN_WIDTH;
-        if(a->pos.y >= SCREEN_HEIGHT) a->pos.y -= SCREEN_HEIGHT;
+        if (game->Bullets[i].lifetime <= 0) {
+            game->Bullets.remove(i);
+            continue;
+        }
         
+        game->Bullets[i].pos = game->Bullets[i].pos + game->Bullets[i].vel * dt;
+        WrapPosition(&(game->Bullets[i].pos));
+    }
+}
+
+
+void DrawBullets(SDL_Surface* Surface, GameState* game) {
+    
+    for(int i = 0; i < game->Bullets.length; i++) {
+        bullet b = game->Bullets[i];
+        int trail_length = 5;
+        v2 trail_pos = b.pos;
+        v2 trail_dir = -normalize(b.vel);
+        PlotPoint(Surface, (int)b.pos.x, (int)b.pos.y, 255, 255, 255);
+        for(int i = 1; i <= trail_length; i++) {
+            PlotPoint(Surface, (int)trail_pos.x, (int) trail_pos.y, 255 / i, 255 / i, 255 / i);
+            trail_pos = trail_pos + trail_dir;
+        }
     }
 }
 
@@ -571,7 +614,8 @@ void Draw(GameState* game, SDL_Surface* Surface) {
     
     //Drawing
     SDL_FillRect(Surface, NULL, SDL_MapRGB(Surface->format, 0, 0, 0));
-    DrawAsteroids(Surface, &GlobalGameState);
+    DrawAsteroids(Surface, game);
+    DrawBullets(Surface, game);
     DrawPlayer(Surface, &(game->player));
 }
 
@@ -602,13 +646,15 @@ void ProcessEvents() {
 
 
 
-void InitGame(GameState* State) {
-    State->player.pos = V2(320, 240);
-    State->player.vel = {0};
-    State->player.rotation = {0};
-    State->player.rotation.y = 1;
+void InitGame(GameState* game) {
+    game->player.pos = V2(320, 240);
+    game->player.vel = {0};
+    game->player.rotation = {0};
+    game->player.rotation.y = 1;
     
-    GenAsteroids(State, 50);
+    game->Bullets.init();
+    
+    GenAsteroids(game, 10);
 } 
 
 

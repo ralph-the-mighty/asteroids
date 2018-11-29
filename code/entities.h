@@ -14,4 +14,8 @@ struct asteroid {
 
 
 
-
+struct bullet {
+    v2 pos;
+    v2 vel;
+    float lifetime;
+};

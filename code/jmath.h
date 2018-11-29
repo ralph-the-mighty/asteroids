@@ -62,6 +62,14 @@ struct v2 {
         return result;
     }
     
+    // TODO(JOSH): add other operators, check to see if this is actually correct and all that
+    inline void operator+=(v2 rhs) {
+        x += rhs.x;
+        y += rhs.x;
+        
+    }
+    
+    
     inline v2 operator-(v2 rhs) {
         v2 result;
         result.x = x - rhs.x;
