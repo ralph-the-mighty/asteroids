@@ -45,6 +45,10 @@ bool debug_mode = false;
 unsigned int frame = 0;
 
 
+#define ISDOWN(key) (Keys[SDL_SCANCODE_##key].isDown)
+#define WASDOWN(key) (Keys[SDL_SCANCODE_##key].wasDown)
+#define CAMEDOWN(key) (ISDOWN(key) && !WASDOWN(key))
+
 
 
 struct Player {
@@ -58,7 +62,6 @@ struct GameState {
     Player player;
     int score;
     array<asteroid> Asteroids;
-    array<bullet> Bullets;
 };
 
 
@@ -425,7 +428,7 @@ void DrawPlayer(SDL_Surface* Surface, Player* player) {
     
     //draw flame
     
-    if(Keys[SDL_SCANCODE_UP].isDown && (frame % 2) == 0) {
+    if(ISDOWN(UP) && (frame % 2) == 0) {
         v2 p1 = Point1 - (player->rotation * 2) - PerpRotation * 3;
         v2 p2 = Point2 - (player->rotation * 2) + PerpRotation * 3;
         v2 p3 = player->pos - (player->rotation * 10);
@@ -479,25 +482,25 @@ void Update(GameState* game, double dt) {
     frame++;
     
     
-    if(Keys[SDL_SCANCODE_P].isDown && !Keys[SDL_SCANCODE_P].wasDown) {
+    if(CAMEDOWN(P)) {
         paused = !paused;
     }
     
     
-    if(Keys[SDL_SCANCODE_D].isDown && !Keys[SDL_SCANCODE_D].wasDown) {
+    if(CAMEDOWN(P)) {
         debug_mode = !debug_mode;
     }
     
-    if(Keys[SDL_SCANCODE_SPACE].isDown && !Keys[SDL_SCANCODE_SPACE].wasDown && paused) {
+    if(CAMEDOWN(SPACE) && paused) {
         goto updateplayer;
     }
     
     
-    if(Keys[SDL_SCANCODE_G].isDown && !Keys[SDL_SCANCODE_G].wasDown) {
+    if(CAMEDOWN(G)) {
         GenAsteroids(&GlobalGameState, 5);
     }
     
-    if(Keys[SDL_SCANCODE_K].isDown && !Keys[SDL_SCANCODE_K].wasDown) {
+    if(CAMEDOWN(K)) {
         game->Asteroids.remove(0);
     }
     
@@ -507,7 +510,7 @@ void Update(GameState* game, double dt) {
     
     updateplayer:
     //update player
-    if(Keys[SDL_SCANCODE_LEFT].isDown) {
+    if(ISDOWN(LEFT)) {
         v2 NewRotation = {0};
         NewRotation.x = GlobalGameState.player.rotation.x * cos(-TURN_RATE) - GlobalGameState.player.rotation.y * sin(-TURN_RATE);
         NewRotation.y = GlobalGameState.player.rotation.x * sin(-TURN_RATE) + GlobalGameState.player.rotation.y * cos(-TURN_RATE);
@@ -516,7 +519,7 @@ void Update(GameState* game, double dt) {
         
     }
     
-    if(Keys[SDL_SCANCODE_RIGHT].isDown) {
+    if(ISDOWN(RIGHT)) {
         v2 NewRotation = {0};
         NewRotation.x = GlobalGameState.player.rotation.x * cos(TURN_RATE) - GlobalGameState.player.rotation.y * sin(TURN_RATE);
         NewRotation.y = GlobalGameState.player.rotation.x * sin(TURN_RATE) + GlobalGameState.player.rotation.y * cos(TURN_RATE);
@@ -524,7 +527,7 @@ void Update(GameState* game, double dt) {
         GlobalGameState.player.rotation = NewRotation;
     }
     
-    if(Keys[SDL_SCANCODE_UP].isDown) {
+    if(ISDOWN(UP)) {
         GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 5;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
