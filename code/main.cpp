@@ -1,5 +1,3 @@
-
-
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <stdio.h>
@@ -526,8 +524,8 @@ void Update(GameState* game, double dt) {
         
         GlobalGameState.player.rotation = NewRotation;
     }
-    
     if(ISDOWN(UP)) {
+        
         GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 5;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
