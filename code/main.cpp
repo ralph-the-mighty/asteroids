@@ -9,9 +9,13 @@
 #include "jmath.h"
 #include "array.cpp"
 
-#define TURN_RATE M_PI * 0.015f
-#define MAX_VEL 400.0f
-#define MIN_VEL 0.0f
+
+
+
+#define TURN_RATE M_PI * 1.5f // radians / sec
+#define THRUST_VEL 500.0f     // pixels / sec^2
+#define MAX_VEL 400.0f        // pixels / sec
+#define MIN_VEL 0.0f          // pixels / sec
 
 
 #define internal static
@@ -510,8 +514,8 @@ void Update(GameState* game, double dt) {
     //update player
     if(ISDOWN(LEFT)) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(-TURN_RATE) - GlobalGameState.player.rotation.y * sin(-TURN_RATE);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(-TURN_RATE) + GlobalGameState.player.rotation.y * cos(-TURN_RATE);
+        NewRotation.x = GlobalGameState.player.rotation.x * cos(-TURN_RATE * dt) - GlobalGameState.player.rotation.y * sin(-TURN_RATE * dt);
+        NewRotation.y = GlobalGameState.player.rotation.x * sin(-TURN_RATE * dt) + GlobalGameState.player.rotation.y * cos(-TURN_RATE * dt);
         
         GlobalGameState.player.rotation = NewRotation;
         
@@ -519,14 +523,14 @@ void Update(GameState* game, double dt) {
     
     if(ISDOWN(RIGHT)) {
         v2 NewRotation = {0};
-        NewRotation.x = GlobalGameState.player.rotation.x * cos(TURN_RATE) - GlobalGameState.player.rotation.y * sin(TURN_RATE);
-        NewRotation.y = GlobalGameState.player.rotation.x * sin(TURN_RATE) + GlobalGameState.player.rotation.y * cos(TURN_RATE);
+        NewRotation.x = GlobalGameState.player.rotation.x * cos(TURN_RATE * dt) - GlobalGameState.player.rotation.y * sin(TURN_RATE * dt);
+        NewRotation.y = GlobalGameState.player.rotation.x * sin(TURN_RATE * dt) + GlobalGameState.player.rotation.y * cos(TURN_RATE * dt);
         
         GlobalGameState.player.rotation = NewRotation;
     }
     if(ISDOWN(UP)) {
         
-        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * 5;
+        GlobalGameState.player.vel = GlobalGameState.player.vel + GlobalGameState.player.rotation * THRUST_VEL * dt;
         if (length(GlobalGameState.player.vel) > MAX_VEL) {
             GlobalGameState.player.vel = normalize(GlobalGameState.player.vel) * MAX_VEL;
         }
@@ -604,7 +608,7 @@ void InitGame(GameState* State) {
     State->player.rotation = {0};
     State->player.rotation.y = 1;
     
-    GenAsteroids(State, 5);
+    GenAsteroids(State, 50);
 } 
 
 
@@ -673,18 +677,18 @@ int main( int argc, char* args[] ) {
     InitGame(&GlobalGameState);
     
     double SecondsPerTick = 1.0 / SDL_GetPerformanceFrequency();
-    const double dt = 0.01;
+    const double dt = 1.0f / 60.0f;
     double currentTime = SDL_GetPerformanceCounter() * SecondsPerTick;
     double accumulator = 0.0;
     
-    printf("seconds per tick: %f\n", SecondsPerTick);
-    printf("currentTime: %f\n", currentTime);
     
     while(running) {
         double newTime = SDL_GetPerformanceCounter() * SecondsPerTick;
         double frameTime = newTime - currentTime;
         currentTime = newTime;
         accumulator += frameTime;
+        
+        printf("Time this frame: %f\r", frameTime);
         
         while(accumulator >= dt) {
             ProcessEvents();
