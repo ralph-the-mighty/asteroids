@@ -12,11 +12,11 @@
 
 
 
-#define TURN_RATE M_PI * 1.5f // radians / sec
-#define THRUST_VEL 500.0f     // pixels / sec^2
-#define MAX_VEL 400.0f        // pixels / sec
-#define MIN_VEL 0.0f          // pixels / sec
-
+#define TURN_RATE M_PI * 1.5f        // radians / sec
+#define THRUST_VEL 500.0f            // pixels / sec^2
+#define PLAYER_MAX_VEL 400.0f        // pixels / sec
+#define PLAYER_MIN_VEL 0.0f          // pixels / sec
+#define BULLET_VEL 500.0f            // pixels / sec
 
 #define internal static
 #define local_persist static
@@ -501,7 +501,7 @@ void Update(GameState* game, double dt) {
     }
     
     
-    if(CAMEDOWN(P)) {
+    if(CAMEDOWN(D)) {
         debug_mode = !debug_mode;
     }
     
@@ -543,8 +543,8 @@ void Update(GameState* game, double dt) {
     
     if(ISDOWN(UP)) {
         game->player.vel = game->player.vel + game->player.rotation * THRUST_VEL * dt;
-        if (length(game->player.vel) > MAX_VEL) {
-            game->player.vel = normalize(game->player.vel) * MAX_VEL;
+        if (length(game->player.vel) > PLAYER_MAX_VEL) {
+            game->player.vel = normalize(game->player.vel) * PLAYER_MAX_VEL;
         }
     }
     
@@ -552,7 +552,7 @@ void Update(GameState* game, double dt) {
         bullet Bullet = {0};
         Bullet.lifetime = 2.0f;
         Bullet.pos = game->player.pos + game->player.rotation * 15;
-        Bullet.vel = (game->player.rotation * 200);
+        Bullet.vel = (game->player.rotation * BULLET_VEL);
         game->Bullets.insert(Bullet);
     }
     
