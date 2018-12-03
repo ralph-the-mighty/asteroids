@@ -1,6 +1,6 @@
 #include "jmath.h"
 
-struct asteroid {
+struct Asteroid {
     //in object space
     v2 vertices[5];
     float size;
@@ -14,7 +14,7 @@ struct asteroid {
 
 
 
-struct bullet {
+struct Bullet {
     v2 pos;
     v2 vel;
     float lifetime;

@@ -112,7 +112,26 @@ inline float dot(v2 u, v2 v) {
 }
 
 
-//v3 vectors
+inline v2 translate(v2 origin, v2 point) {
+    return point + origin;
+}
+
+inline v2 rotate(float angle, v2 point) {
+    v2 result;
+    result.x = point.x * cos(angle) - point.y * sin(angle);
+    result.y = point.x * sin(angle) + point.y * cos(angle);
+    return result;
+}
+
+
+inline v2 transform(float angle, v2 origin, v2 point) {
+    return translate(origin, rotate(angle, point));
+}
+
+
+
+
+//3D vectors
 
 struct v3 {
     float x;
@@ -175,5 +194,41 @@ inline v3 normalize(v3 v) {
     }
     return v;
 }
+
+
+
+
+
+
+
+
+bool PointInPolygon(v2 Point, v2* Vertices, int VertexCount) {
+    int i, j = VertexCount - 1;
+    bool Odd = false;
+    
+    for(i = 0; i < VertexCount; i++){
+        // TODO(JOSH): check for and skip points  that are colinear with a side?
+        //check for horizontal cast intersection
+        if(Vertices[i].y < Point.y && Vertices[j].y >= Point.y
+           || Vertices[j].y < Point.y && Vertices[i].y >= Point.y) {
+            // calculate intersection
+            if(Vertices[i].x + (Point.y - Vertices[i].y) / (Vertices[j].y - Vertices[i].y) * (Vertices[j].x - Vertices[i].x) < Point.x) {
+                Odd = !Odd;
+            }
+        }
+        j = i;
+    }
+    
+    return Odd;
+    
+}
+
+
+
+
+
+
+
+
 
 #endif

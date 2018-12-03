@@ -63,8 +63,8 @@ struct Player {
 struct GameState {
     Player player;
     int score;
-    array<asteroid> Asteroids;
-    array<bullet> Bullets;
+    array<Asteroid> asteroids;
+    array<Bullet> bullets;
 };
 
 
@@ -129,11 +129,11 @@ bool IsConvex(v2* poly, int n) {
 
 
 void GenAsteroids(GameState* State, int count) {
-    State->Asteroids.destroy();
-    State->Asteroids.init();
+    State->asteroids.destroy();
+    State->asteroids.init();
     
     for(int i = 0; i < count; i++) {
-        asteroid a = {0}; 
+        Asteroid a = {0}; 
         a.size = 50;
         
         do {
@@ -171,7 +171,7 @@ void GenAsteroids(GameState* State, int count) {
         a.vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
         a.rot_vel = randf() * 5 - 5;
         
-        State->Asteroids.insert(a);
+        State->asteroids.insert(a);
         
     }
 }
@@ -221,8 +221,6 @@ void PlotPointBlend(SDL_Surface* Surface, int X, int Y, unsigned char Brightness
     if (Brightness > (unsigned char) *PixelP) {
         *PixelP = (Brightness) | (Brightness << 8) | (Brightness << 16);
     }
-    
-    
 }
 
 
@@ -256,13 +254,13 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
         // TODO(JOSH): Too many conditionals here. break into separate branches
         for(int Y = MIN(Y0, Y1); Y <= MAX(Y0, Y1); Y++) {
             //TODO: just set the bloody pixels
-            PlotPointBlend(Surface, X0, Y, 0xff);
+            PlotPoint(Surface, X0, Y, R, G, B);
         }
     } else if (Y0 == Y1) {
         //horizontal line
         for(int X = MIN(X0, X1); X <= MAX(X0, X1); X++) {
             //TODO: just set the bloody pixels
-            PlotPointBlend(Surface, X, Y0, 0xff);
+            PlotPoint(Surface, X, Y0, R, G, B);
         }
     } else if (ABS(Slope) < 1) {
         //shallow line
@@ -270,7 +268,7 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
         int Y = Y0;
         
         for(int X = X0; X <= X1; X++) {
-            PlotPointBlend(Surface, X, Y, 0xff);
+            PlotPoint(Surface, X, Y, R, G, B);
             Error += ABS(Slope);
             while(Error >= 0.5) {
                 Y += DeltaY < 0 ? 1 : -1;
@@ -287,7 +285,7 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
         
         if(Y0 < Y1) {
             for(int Y = Y0; Y <= Y1; Y++) {
-                PlotPointBlend(Surface, X, Y, 0xff);
+                PlotPoint(Surface, X, Y, R, G, B);
                 Error += DeltaError;
                 while(Error >= 0.5) {
                     X += DeltaX < 0 ? 1 : -1;
@@ -296,7 +294,7 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
             }
         } else {
             for(int Y = Y0; Y >= Y1; Y--) {
-                PlotPointBlend(Surface, X, Y, 0xff);
+                PlotPoint(Surface, X, Y, R, G, B);
                 Error += DeltaError;
                 while(Error >= 0.5) {
                     X += DeltaX < 0 ? 1 : -1;
@@ -307,6 +305,10 @@ void DrawLineBresenham(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1, int
     }
 }
 
+
+void DrawLineBresenham(SDL_Surface *surface, v2 p1, v2 p2, int r, int g, int b) {
+    DrawLineBresenham(surface, (int)p1.x, (int)p1.y, (int)p2.x, (int)p2.y, r, g, b);
+}
 
 
 
@@ -398,6 +400,10 @@ void DrawLineWu(SDL_Surface* Surface, int X0, int Y0, int X1, int Y1) {
     }
 }
 
+void DrawLineWu(SDL_Surface *surface, v2 p1, v2 p2) {
+    DrawLineWu(surface, (int)p1.x, (int)p1.y, (int)p2.x, (int)p2.y);
+}
+
 
 
 void DrawTriangle(SDL_Surface* Surface, v2 p1, v2 p2, v2 p3) {
@@ -453,31 +459,40 @@ void DrawMarker(SDL_Surface *Surface, int x, int y, int R, int G, int B) {
 
 
 
-void DrawAsteroids(SDL_Surface* Surface, GameState* State) {
-    for(int i = 0; i < State->Asteroids.length; i++) {
-        asteroid a = State->Asteroids[i];
+void DrawAsteroids(SDL_Surface* Surface, GameState* game) {
+    
+    for(int i = 0; i < game->asteroids.length; i++) {
+        Asteroid a = game->asteroids[i];
         int j;
         for(j = 0; j < ARRAY_SIZE(a.vertices) - 1; j++) {
-            DrawLineWu(Surface,
-                       (int)(a.vertices[j].x * cos(a.rot) - a.vertices[j].y * sin(a.rot)) + a.pos.x,
-                       (int)(a.vertices[j].x * sin(a.rot) + a.vertices[j].y * cos(a.rot)) + a.pos.y,
-                       (int)(a.vertices[j + 1].x * cos(a.rot) - a.vertices[j + 1].y * sin(a.rot)) + a.pos.x,
-                       (int)(a.vertices[j + 1].x * sin(a.rot) + a.vertices[j + 1].y * cos(a.rot) + a.pos.y));
+            DrawLineWu(Surface, transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[j + 1]));
             
         }
         
-        DrawLineWu(Surface,
-                   (int)(a.vertices[j].x * cos(a.rot) - a.vertices[j].y * sin(a.rot) + a.pos.x),
-                   (int)(a.vertices[j].x * sin(a.rot) + a.vertices[j].y * cos(a.rot) + a.pos.y),
-                   (int)(a.vertices[0].x * cos(a.rot) - a.vertices[0].y * sin(a.rot) + a.pos.x),
-                   (int)(a.vertices[0].x * sin(a.rot) + a.vertices[0].y * cos(a.rot) + a.pos.y));
+        DrawLineWu(Surface, transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[0]));
         
         
         if(debug_mode) { 
             DrawMarker(Surface, (int)a.pos.x, (int)a.pos.y, 255, 0, 0);
+            v2 transformed_points[5];
+            for(int l = 0; l < 5; l++) {
+                transformed_points[l] = transform(a.rot, a.pos, a.vertices[l]);
+            }
+            for(int k = 0; k < game->bullets.length; k++) {
+                if(PointInPolygon(game->bullets[k].pos , transformed_points, 5)) {
+                    int j;
+                    for(j = 0; j < ARRAY_SIZE(a.vertices) - 1; j++) {
+                        DrawLineBresenham(Surface,transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[j + 1]), 255, 0, 0);
+                        
+                    }
+                    
+                    DrawLineBresenham(Surface,transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[0]), 255, 0, 0);
+                }
+            }
         }
     }
 }
+
 
 
 inline void WrapPosition(v2* pos) {
@@ -511,11 +526,11 @@ void Update(GameState* game, double dt) {
     
     
     if(CAMEDOWN(G)) {
-        GenAsteroids(&GlobalGameState, 5);
+        GenAsteroids(&GlobalGameState, 10);
     }
     
     if(CAMEDOWN(K)) {
-        game->Asteroids.remove(0);
+        game->asteroids.remove(0);
     }
     
     if (paused) return;
@@ -549,11 +564,11 @@ void Update(GameState* game, double dt) {
     }
     
     if(CAMEDOWN(SPACE)) {
-        bullet Bullet = {0};
-        Bullet.lifetime = 2.0f;
-        Bullet.pos = game->player.pos + game->player.rotation * 15;
-        Bullet.vel = (game->player.rotation * BULLET_VEL);
-        game->Bullets.insert(Bullet);
+        Bullet bullet = {0};
+        bullet.lifetime = 2.0f;
+        bullet.pos = game->player.pos + game->player.rotation * 15;
+        bullet.vel = (game->player.rotation * BULLET_VEL);
+        game->bullets.insert(bullet);
     }
     
     
@@ -565,8 +580,8 @@ void Update(GameState* game, double dt) {
     
     //update asteroids
     // TODO(JOSH): Find the bug where the positions dont update correctly at the edges
-    for(int i = 0; i < game->Asteroids.length; i++) {
-        asteroid* a = &(game->Asteroids[i]);
+    for(int i = 0; i < game->asteroids.length; i++) {
+        Asteroid* a = &(game->asteroids[i]);
         a->pos.x += a->vel.x * dt;
         a->pos.y += a->vel.y * dt;
         a->rot += a->rot_vel * dt;
@@ -581,24 +596,24 @@ void Update(GameState* game, double dt) {
     
     //update bullets
     
-    for(int i = 0; i < game->Bullets.length; i++) {
-        game->Bullets[i].lifetime -= dt;
+    for(int i = 0; i < game->bullets.length; i++) {
+        game->bullets[i].lifetime -= dt;
         
-        if (game->Bullets[i].lifetime <= 0) {
-            game->Bullets.remove(i);
+        if (game->bullets[i].lifetime <= 0) {
+            game->bullets.remove(i);
             continue;
         }
         
-        game->Bullets[i].pos = game->Bullets[i].pos + game->Bullets[i].vel * dt;
-        WrapPosition(&(game->Bullets[i].pos));
+        game->bullets[i].pos = game->bullets[i].pos + game->bullets[i].vel * dt;
+        WrapPosition(&(game->bullets[i].pos));
     }
 }
 
 
 void DrawBullets(SDL_Surface* Surface, GameState* game) {
     
-    for(int i = 0; i < game->Bullets.length; i++) {
-        bullet b = game->Bullets[i];
+    for(int i = 0; i < game->bullets.length; i++) {
+        Bullet b = game->bullets[i];
         int trail_length = 5;
         v2 trail_pos = b.pos;
         v2 trail_dir = -normalize(b.vel);
@@ -652,7 +667,7 @@ void InitGame(GameState* game) {
     game->player.rotation = {0};
     game->player.rotation.y = 1;
     
-    game->Bullets.init();
+    game->bullets.init();
     
     GenAsteroids(game, 10);
 } 
@@ -666,46 +681,13 @@ void WriteDebugStats(GameState* State) {
     fprintf(file, "Player info:\n");
     fprintf(file, "  %f, %f", State->player.pos.x, State->player.pos.y);
     fprintf(file, "\nAsteroid info:\n");
-    for(int i = 0; i < State->Asteroids.length; i++) {
-        asteroid a = State->Asteroids[i];
+    for(int i = 0; i < State->asteroids.length; i++) {
+        Asteroid a = State->asteroids[i];
         fprintf(file, "  %i: %f, %f\n", i, a.pos.x, a.pos.y); 
     }
     fclose(file);
 }
-/*
-void EraseDebugStats(){
-remove
-}
 
-*/
-
-
-void test() {
-#define NUM 16
-    array<int> a;
-    a.init();
-    
-    for(int i = 0; i < NUM; i++) {
-        a.insert(i);
-    }
-    
-    for(int i = 0; i < a.length; i++) {
-        assert(a[i] == i);
-    }
-    
-    for(int i = 0; i < NUM; i++) {
-        a.remove(0);
-    }
-    
-    
-    
-    for(int i = 0; i < NUM; i++) {
-        a.insert(i);
-    }
-    
-    a.insert(100);
-    a.destroy();
-}
 
 
 
@@ -714,9 +696,6 @@ int main( int argc, char* args[] ) {
     if(!SDL_Init()){
         return 0;
     }
-    
-    test();
-    
     
     srand(time(NULL));
     
@@ -739,7 +718,7 @@ int main( int argc, char* args[] ) {
         while(accumulator >= dt) {
             ProcessEvents();
             Update(&GlobalGameState, dt);
-            WriteDebugStats(&GlobalGameState);
+            //WriteDebugStats(&GlobalGameState);
             accumulator -= dt;
         }
         
