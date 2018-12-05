@@ -5,6 +5,8 @@ struct Asteroid {
     v2 vertices[5];
     float size;
     
+    int gen;
+    
     float rot;
     float rot_vel;
     

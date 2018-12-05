@@ -35,7 +35,17 @@ float randf() {
 }
 
 
+// TODO(JOSH): test, debug these functions
+float lerp(float a, float b, float e) {
+    assert(e >= 0.0f && e <= 1.0f);
+    assert(a <= b);
+    return (b - a) * e + a;
+}
 
+
+float rand_in_range(float a, float b) {
+    return lerp(a, b, randf());
+}
 
 
 

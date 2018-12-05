@@ -128,51 +128,59 @@ bool IsConvex(v2* poly, int n) {
 }
 
 
-void GenAsteroids(GameState* State, int count) {
-    State->asteroids.destroy();
-    State->asteroids.init();
+void GenAsteroid(GameState* game, v2 pos, float size, int gen) {
+    Asteroid a = {0};
+    a.pos = pos;
+    a.size = size;
+    a.gen = gen;
+    
+    do {
+        for (int j = 0; j < 5; j++){
+            float angle = j * (2 * M_PI) / 5;
+            float distance = rand_in_range(a.size / 4, a.size);
+            a.vertices[j] = {(float)cos(angle) * (distance), (float)sin(angle) * distance};
+        }
+        
+    } while(!IsConvex(a.vertices, 5));
+    
+    
+    //adjust points so that origin is center of gravity;
+    
+    
+    v2 sum = {0};
+    float f;
+    float twicearea = 0;
+    
+    for(int k = 0; k < 5; k++) {
+        v2 p1 = a.vertices[k];
+        v2 p2 = a.vertices[(k + 1) % 5];
+        f = (p1.x * p2.y - p2.x * p1.y);
+        sum.x += (p1.x + p2.x) * f;
+        sum.y += (p1.y + p2.y) * f;
+        twicearea += f;
+    }
+    
+    for(int k = 0; k < 5; k++) {
+        a.vertices[k].x -= (sum.x / (twicearea * 3));
+        a.vertices[k].y -= (sum.y / (twicearea * 3));
+    }
+    
+    a.vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
+    a.rot_vel = randf() * 5 - 5;
+    
+    game->asteroids.insert(a);
+    
+}
+
+
+
+void GenAsteroids(GameState* game, int count) {
+    game->asteroids.destroy();
+    game->asteroids.init();
     
     for(int i = 0; i < count; i++) {
-        Asteroid a = {0}; 
-        a.size = 50;
-        
-        do {
-            for (int j = 0; j < 6; j++){
-                float angle = j * (2 * M_PI) / 5;
-                a.vertices[j] = {(float)cos(angle) * (randf() * a.size), (float)sin(angle) * (randf() * a.size)};
-            }
-            
-        } while(!IsConvex(a.vertices, 5));
-        
-        
-        a.pos = { randf() * SCREEN_WIDTH, randf() * SCREEN_HEIGHT };
-        
-        //adjust points so that origin is center of gravity;
-        
-        
-        v2 sum = {0};
-        float f;
-        float twicearea = 0;
-        
-        for(int k = 0; k < 5; k++) {
-            v2 p1 = a.vertices[k];
-            v2 p2 = a.vertices[(k + 1) % 5];
-            f = (p1.x * p2.y - p2.x * p1.y);
-            sum.x += (p1.x + p2.x) * f;
-            sum.y += (p1.y + p2.y) * f;
-            twicearea += f;
-        }
-        
-        for(int k = 0; k < 5; k++) {
-            a.vertices[k].x -= (sum.x / (twicearea * 3));
-            a.vertices[k].y -= (sum.y / (twicearea * 3));
-        }
-        
-        a.vel = {randf() * 100.0f - 50.0f, randf() * 100.0f - 50.0f };
-        a.rot_vel = randf() * 5 - 5;
-        
-        State->asteroids.insert(a);
-        
+        v2 pos = { randf() * SCREEN_WIDTH, randf() * SCREEN_HEIGHT };
+        GenAsteroid(game, pos, 50, 2);
     }
 }
 
@@ -474,21 +482,6 @@ void DrawAsteroids(SDL_Surface* Surface, GameState* game) {
         
         if(debug_mode) { 
             DrawMarker(Surface, (int)a.pos.x, (int)a.pos.y, 255, 0, 0);
-            v2 transformed_points[5];
-            for(int l = 0; l < 5; l++) {
-                transformed_points[l] = transform(a.rot, a.pos, a.vertices[l]);
-            }
-            for(int k = 0; k < game->bullets.length; k++) {
-                if(PointInPolygon(game->bullets[k].pos , transformed_points, 5)) {
-                    int j;
-                    for(j = 0; j < ARRAY_SIZE(a.vertices) - 1; j++) {
-                        DrawLineBresenham(Surface,transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[j + 1]), 255, 0, 0);
-                        
-                    }
-                    
-                    DrawLineBresenham(Surface,transform(a.rot, a.pos, a.vertices[j]), transform(a.rot, a.pos, a.vertices[0]), 255, 0, 0);
-                }
-            }
         }
     }
 }
@@ -606,6 +599,26 @@ void Update(GameState* game, double dt) {
         
         game->bullets[i].pos = game->bullets[i].pos + game->bullets[i].vel * dt;
         WrapPosition(&(game->bullets[i].pos));
+    }
+    
+    
+    //collision detection
+    for(int i = 0; i < game->asteroids.length; i++) {
+        Asteroid a = game->asteroids[i];
+        v2 transformed_points[5];
+        for(int j = 0; j < 5; j++) {
+            transformed_points[j] = transform(a.rot, a.pos, a.vertices[j]);
+        }
+        for(int k = 0; k < game->bullets.length; k++) {
+            if(PointInPolygon(game->bullets[k].pos , transformed_points, 5)) {
+                if(a.gen > 0) {
+                    GenAsteroid(game, a.pos, a.size * 0.75, a.gen - 1);
+                    GenAsteroid(game, a.pos, a.size * 0.75, a.gen - 1);
+                }
+                game->bullets.remove(k);
+                game->asteroids.remove(i);
+            }
+        }
     }
 }
 
